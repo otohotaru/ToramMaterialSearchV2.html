@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>トーラムオンライン 素材から武器検索</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f4f4f4;
+        }
+        #search-container {
+            max-width: 600px;
+            margin: 0 auto;
+        }
+        #material-input {
+            width: 100%;
+            padding: 10px;
+            font-size: 16px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            box-sizing: border-box;
+            margin-bottom: 10px;
+        }
+        #results {
+            margin-top: 20px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+        }
+        th, td {
+            border: 1px solid #ccc;
+            padding: 8px;
+            text-align: left;
+        }
+        th {
+            background-color: #007bff;
+            color: #fff;
+        }
+        .no-result {
+            color: #888;
+        }
+        .filter-buttons {
+            margin-bottom: 10px;
+        }
+        .filter-buttons button {
+            padding: 8px 12px;
+            margin-right: 5px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            background-color: #fff;
+            cursor: pointer;
+        }
+        .filter-buttons button.active {
+            background-color: #007bff;
+            color: #fff;
+        }
+        #search-button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            background-color: #28a745;
+            color: #fff;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+        .input-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+    </style>
+    <script src="https://unpkg.com/wanakana"></script>
+</head>
+<body>
+    <div id="search-container">
+        <h1>トーラムオンライン 素材から武器検索</h1>
+        <div class="filter-buttons">
+            <button class="weapon-type active" data-type="one-handed">片手剣</button>
+            <button class="weapon-type active" data-type="two-handed">両手剣</button>
+            <button class="weapon-type" data-type="bow">弓</button>
+            <button class="weapon-type" data-type="auto-bow">自動弓</button>
+        </div>
+        <div class="input-group">
+            <label for="material-input">素材検索</label>
+            <input type="text" id="material-input" placeholder="例：蛮竜の鱗、火山猟犬の角">
+        </div>
+        <button id="search-button">検索</button>
+        <div id="results"><p class="no-result">素材を入力してください</p></div>
+    </div>
+
+    <script>
+        // 武器データ（片手剣＋両手剣、SPは半角統一）
+        const weapons = [
+            // 片手剣データ（48種）
+            { jp: "ウッドソード", en: "Wood Sword", atk: 10, note: "", type: "one-handed", materials: [{ name: "木材", sp: 25 }] },
+            { jp: "ショートソード", en: "Short Sword", atk: 10, note: "", type: "one-handed", materials: [{ name: "金属", sp: 3 }] },
+            { jp: "ロングソード", en: "Long Sword", atk: 17, note: "", type: "one-handed", materials: [{ name: "小さい剣柄", sp: 20 }, { name: "金属", sp: 25 }] },
+            { jp: "グラディウス", en: "Gladius", atk: 25, note: "", type: "one-handed", materials: [{ name: "ギザギザの歯", sp: 25 }, { name: "ボロボロの刃", sp: 25 }, { name: "金属", sp: 50 }] },
+            { jp: "サーベル", en: "Saber", atk: 34, note: "", type: "one-handed", materials: [{ name: "使い古された刃", sp: 20 }, { name: "鋭い牙", sp: 30 }, { name: "金属", sp: 75 }] },
+            { jp: "蛮竜の剣", en: "Brutal Dragon Sword", atk: 27, note: "", type: "one-handed", materials: [{ name: "蛮竜の尻尾", sp: 1 }, { name: "蛮竜の爪", sp: 4 }, { name: "金属", sp: 100 }, { name: "獣品", sp: 75 }] },
+            { jp: "アーデルソード", en: "Adel Sword", atk: 40, note: "", type: "one-handed", materials: [{ name: "ゴブリンの鉤爪", sp: 25 }, { name: "ポトゥムのヒレ", sp: 15 }, { name: "金属", sp: 75 }, { name: "木材", sp: 25 }] },
+            { jp: "レイピア", en: "Rapier", atk: 56, note: "", type: "one-handed", materials: [{ name: "上質な砂", sp: 5 }, { name: "竜の骨", sp: 30 }, { name: "金属", sp: 100 }, { name: "木材", sp: 25 }] },
+            { jp: "クライムソード", en: "Clime Sword", atk: 61, note: "闇属性", type: "one-handed", materials: [{ name: "扉悪魔の魔爪", sp: 1 }, { name: "ロノーゴ石材", sp: 25 }, { name: "金属", sp: 350 }, { name: "獣品", sp: 200 }] },
+            { jp: "シミター", en: "Scimitar", atk: 70, note: "", type: "one-handed", materials: [{ name: "ダマスカ鉱石", sp: 10 }, { name: "流砂の結晶", sp: 5 }, { name: "金属", sp: 100 }, { name: "獣品", sp: 50 }] },
+            { jp: "フィトエスパーダ", en: "Phyto Espada", atk: 74, note: "", type: "one-handed", materials: [{ name: "草竜の鱗", sp: 3 }, { name: "草竜の輝弁花", sp: 1 }, { name: "金属", sp: 500 }, { name: "木材", sp: 200 }] },
+            { jp: "ブリッツソード", en: "Blitz Sword", atk: 80, note: "", type: "one-handed", materials: [{ name: "大きなボルト", sp: 30 }, { name: "悪霊の爪", sp: 20 }, { name: "金属", sp: 125 }, { name: "獣品", sp: 50 }] },
+            { jp: "虚妄の黒剣", en: "False Black Sword", atk: 94, note: "", type: "one-handed", materials: [{ name: "禍々しい結晶", sp: 1 }, { name: "虚妄の邪気", sp: 2 }, { name: "金属", sp: 500 }, { name: "獣品", sp: 250 }] },
+            { jp: "イルウーン", en: "Illuoon", atk: 100, note: "", type: "one-handed", materials: [{ name: "ミスリル鉱石", sp: 5 }, { name: "錆び付いた大斧", sp: 30 }, { name: "金属", sp: 150 }, { name: "木材", sp: 50 }] },
+            { jp: "氷剣グラス", en: "Icebrand Glacier", atk: 101, note: "氷属性", type: "one-handed", materials: [{ name: "氷のバラ", sp: 1 }, { name: "宵闇竜の蒼羽", sp: 5 }, { name: "魔晶獣の豪爪", sp: 3 }, { name: "魔素", sp: 425 }] },
+            { jp: "インディゴソード", en: "Indigo Sword", atk: 109, note: "", type: "one-handed", materials: [{ name: "上質な砂", sp: 5 }, { name: "竜の骨", sp: 30 }, { name: "金属", sp: 100 }, { name: "木材", sp: 25 }] },
+            { jp: "闇将の剣", en: "Dark General's Sword", atk: 130, note: "", type: "one-handed", materials: [{ name: "砕けた魔大剣", sp: 2 }, { name: "高純度魔結晶", sp: 1 }, { name: "金属", sp: 750 }, { name: "獣品", sp: 250 }] },
+            { jp: "ミーレスソード", en: "Mires Sword", atk: 125, note: "", type: "one-handed", materials: [{ name: "曲線上の刃", sp: 20 }, { name: "ひび割れた石皮", sp: 20 }, { name: "金属", sp: 150 }, { name: "獣品", sp: 100 }] },
+            { jp: "レーヴェファング", en: "Leve Fang", atk: 154, note: "", type: "one-handed", materials: [{ name: "プロトレオンの槌片", sp: 2 }, { name: "結晶化した大爪", sp: 4 }, { name: "獣品", sp: 900 }, { name: "金属", sp: 200 }] },
+            { jp: "インペリオソード", en: "Imperio Sword", atk: 140, note: "", type: "one-handed", materials: [{ name: "翠真珠", sp: 5 }, { name: "硬い鉤爪", sp: 30 }, { name: "金属", sp: 200 }, { name: "木材", sp: 75 }] },
+            { jp: "ウィンドレイピア", en: "Wind Rapier", atk: 145, note: "風属性", type: "one-handed", materials: [{ name: "砕けた水晶", sp: 5 }, { name: "トゲトゲしい牙", sp: 20 }, { name: "金属", sp: 150 }, { name: "獣品", sp: 150 }] },
+            { jp: "ザハークセイバー", en: "Zahaak Saber", atk: 180, note: "", type: "one-handed", materials: [{ name: "双頭竜の心臓", sp: 1 }, { name: "双頭竜の尻尾", sp: 2 }, { name: "金属", sp: 1000 }, { name: "獣品", sp: 300 }] },
+            { jp: "エルフィンソード", en: "Elfin Sword", atk: 179, note: "", type: "one-handed", materials: [{ name: "白樹の木材", sp: 20 }, { name: "竜の頸蒼玉", sp: 5 }, { name: "金属", sp: 200 }, { name: "木材", sp: 125 }] },
+            { jp: "ローザクレール", en: "Rosa Claire", atk: 190, note: "", type: "one-handed", materials: [{ name: "エーテルメタル", sp: 1 }, { name: "黒騎士長の勲章", sp: 1 }, { name: "マキナブラッド", sp: 10 }, { name: "金属", sp: 1350 }] },
+            { jp: "カリバー", en: "Caliber", atk: 199, note: "", type: "one-handed", materials: [{ name: "神々しい金属", sp: 5 }, { name: "艶やかな黒皮", sp: 20 }, { name: "金属", sp: 200 }, { name: "木材", sp: 150 }] },
+            { jp: "皇女の剣", en: "Empress Sword", atk: 229, note: "", type: "one-handed", materials: [{ name: "怪物皇帝の装飾片", sp: 2 }, { name: "怪物皇帝の角", sp: 1 }, { name: "金属", sp: 1000 }, { name: "魔素", sp: 450 }] },
+            { jp: "マトンセイバー", en: "Maton Saber", atk: 200, note: "", type: "one-handed", materials: [{ name: "旧式ブレード素材", sp: 2 }, { name: "スルピニア式魔法燈", sp: 1 }, { name: "金属", sp: 1200 }, { name: "薬品", sp: 250 }] },
+            { jp: "フリュックカッター", en: "Fluck Cutter", atk: 220, note: "", type: "one-handed", materials: [{ name: "蒼岩石の欠片", sp: 1 }, { name: "色鮮やかなトサカ", sp: 2 }, { name: "獣品", sp: 1000 }, { name: "金属", sp: 500 }] },
+            { jp: "ショーテル", en: "Shortel", atk: 220, note: "", type: "one-handed", materials: [{ name: "折れた茎", sp: 5 }, { name: "張り付き鉤爪", sp: 20 }, { name: "金属", sp: 200 }, { name: "獣品", sp: 175 }] },
+            { jp: "ホーリーソード", en: "Holy Sword", atk: 242, note: "光属性", type: "one-handed", materials: [{ name: "アイナニス石材", sp: 15 }, { name: "読めない学術書", sp: 20 }, { name: "金属", sp: 250 }, { name: "木材", sp: 150 }] },
+            { jp: "闇竜牙剣", en: "Dark Dragon Fang Sword", atk: 253, note: "", type: "one-handed", materials: [{ name: "闇の宝石", sp: 1 }, { name: "フィンスダンの角", sp: 1 }, { name: "獣品", sp: 1200 }, { name: "金属", sp: 450 }] },
+            { jp: "カタフニアソード", en: "Katafunia Sword", atk: 265, note: "", type: "one-handed", materials: [{ name: "黒い水晶", sp: 4 }, { name: "丈夫な芯", sp: 4 }, { name: "金属", sp: 300 }, { name: "獣品", sp: 125 }] },
+            { jp: "ザフィアーメイス", en: "Zafia Mace", atk: 260, note: "", type: "one-handed", materials: [{ name: "ザフィローガの晶核", sp: 1 }, { name: "ザフィローガの角", sp: 2 }, { name: "金属", sp: 1200 }, { name: "獣品", sp: 600 }] },
+            { jp: "レプタイルソード", en: "Reptile Sword", atk: 289, note: "", type: "one-handed", materials: [{ name: "猿の鋭角", sp: 10 }, { name: "長いたてがみ", sp: 20 }, { name: "金属", sp: 300 }, { name: "獣品", sp: 150 }] },
+            { jp: "リムニソード", en: "Limni Sword", atk: 314, note: "", type: "one-handed", materials: [{ name: "カバの太牙", sp: 15 }, { name: "幾何学的な装甲片", sp: 15 }, { name: "金属", sp: 300 }, { name: "木材", sp: 175 }] },
+            { jp: "皇魔の剣", en: "Imperial Magic Sword", atk: 327, note: "", type: "one-handed", materials: [{ name: "化天怪帝の装飾片", sp: 2 }, { name: "化天怪帝の牙", sp: 2 }, { name: "金属", sp: 1400 }, { name: "魔素", sp: 550 }] },
+            { jp: "ナグアソード", en: "Nagua Sword", atk: 340, note: "", type: "one-handed", materials: [{ name: "怪光る霊水", sp: 2 }, { name: "悪霊の結晶体", sp: 1 }, { name: "金属", sp: 1250 }, { name: "獣品", sp: 750 }] },
+            { jp: "ラスターソード", en: "Raster Sword", atk: 340, note: "", type: "one-handed", materials: [{ name: "竜の角", sp: 20 }, { name: "竜硬石", sp: 20 }, { name: "金属", sp: 300 }, { name: "木材", sp: 200 }] },
+            { jp: "ジェンマスパーダ", en: "Gemmaspada", atk: 353, note: "", type: "one-handed", materials: [{ name: "ジェンマの宝玉", sp: 1 }, { name: "欲望の星彩", sp: 1 }, { name: "金属", sp: 1750 }, { name: "魔素", sp: 300 }] },
+            { jp: "エアリアスパーダ", en: "Aeriaspada", atk: 353, note: "", type: "one-handed", materials: [{ name: "ボマ・コンダ鉱石", sp: 15 }, { name: "クジラの羽", sp: 15 }, { name: "金属", sp: 275 }, { name: "木材", sp: 250 }] },
+            { jp: "塞源の銃剣", en: "Sai Gen no Gunken", atk: 367, note: "", type: "one-handed", materials: [{ name: "ベリュムの結晶炉", sp: 1 }, { name: "球形甲殻節", sp: 2 }, { name: "金属", sp: 1500 }, { name: "木材", sp: 700 }] },
+            { jp: "ルクスリエソード", en: "Luxrie Sword", atk: 395, note: "", type: "one-handed", materials: [{ name: "尖った触角", sp: 5 }, { name: "光沢のある甲殻", sp: 15 }, { name: "金属", sp: 250 }, { name: "獣品", sp: 250 }] },
+            { jp: "ディープソード", en: "Deep Sword", atk: 424, note: "", type: "one-handed", materials: [{ name: "不揃いな木材", sp: 15 }, { name: "テクタイト", sp: 20 }, { name: "金属", sp: 375 }, { name: "獣品", sp: 200 }] },
+            { jp: "ビルロッシュソード", en: "Bilrosh Sword", atk: 454, note: "", type: "one-handed", materials: [{ name: "ビルロッシュの蒼眼", sp: 1 }, { name: "不気味な結晶牙", sp: 2 }, { name: "獣品", sp: 1400 }, { name: "金属", sp: 1000 }] },
+            { jp: "エルデソード", en: "Elde Sword", atk: 454, note: "", type: "one-handed", materials: [{ name: "赤黒い耳", sp: 15 }, { name: "カモの蹴爪", sp: 15 }, { name: "金属", sp: 300 }, { name: "獣品", sp: 300 }] },
+            { jp: "カルエラソード", en: "Caluela Sword", atk: 485, note: "", type: "one-handed", materials: [{ name: "木の長鼻", sp: 20 }, { name: "青魚の鱗", sp: 15 }, { name: "金属", sp: 400 }, { name: "獣品", sp: 225 }] },
+            { jp: "アムニスレイピア", en: "Amnis Rapier", atk: 517, note: "", type: "one-handed", materials: [{ name: "尉竜の棘鎚尾", sp: 1 }, { name: "とても恐ろしい顔面", sp: 2 }, { name: "獣品", sp: 1800 }, { name: "薬品", sp: 800 }] },
+            { jp: "ラスグリフソード", en: "Rasgriff Sword", atk: 584, note: "", type: "one-handed", materials: [{ name: "刻まれた紫眼", sp: 1 }, { name: "侵蝕された樹皮", sp: 2 }, { name: "獣品", sp: 1500 }, { name: "金属", sp: 1300 }] },
+            // 両手剣データ（46種）
+            { jp: "アイアンブレード", en: "Iron Blade", atk: 20, note: "", type: "two-handed", materials: [{ name: "小さい剣柄", sp: 20 }] },
+            { jp: "ヘヴィブレイド", en: "Heavy Blade", atk: 30, note: "", type: "two-handed", materials: [{ name: "分厚いくちばし", sp: 20 }, { name: "金属", sp: 20 }] },
+            { jp: "プレートエッジ", en: "Plate Edge", atk: 40, note: "", type: "two-handed", materials: [{ name: "欠けた金属", sp: 25 }, { name: "二セル木材", sp: 15 }, { name: "金属", sp: 50 }] },
+            { jp: "ロングブレード", en: "Long Blade", atk: 50, note: "", type: "two-handed", materials: [{ name: "鋭い牙", sp: 30 }, { name: "使い古された刃", sp: 20 }, { name: "金属", sp: 60 }, { name: "木材", sp: 15 }] },
+            { jp: "ヴォルカンエッジ", en: "Volcan Edge", atk: 60, note: "", type: "two-handed", materials: [{ name: "火山猟犬の角", sp: 2 }, { name: "炎を宿した宝石", sp: 1 }, { name: "金属", sp: 175 }, { name: "魔素", sp: 25 }] },
+            { jp: "ボーンブレイド", en: "Bone Blade", atk: 70, note: "", type: "two-handed", materials: [{ name: "ひび割れた棍棒", sp: 30 }, { name: "ノコギリ状の刃", sp: 20 }, { name: "獣品", sp: 100 }, { name: "木材", sp: 50 }] },
+            { jp: "フォールブレイド", en: "Fall Blade", atk: 80, note: "", type: "two-handed", materials: [{ name: "異界の腕", sp: 15 }, { name: "黒ずんだ鉱石", sp: 30 }, { name: "金属", sp: 100 }, { name: "木材", sp: 25 }] },
+            { jp: "狂鉄蟹の大剣", en: "Mad Iron Crab Greatsword", atk: 90, note: "", type: "two-handed", materials: [{ name: "鉱質のはさみ", sp: 1 }, { name: "甲殻鋼", sp: 4 }, { name: "金属", sp: 500 }] },
+            { jp: "フランベルジュ", en: "Flamberge", atk: 100, note: "", type: "two-handed", materials: [{ name: "狂った時計針", sp: 20 }, { name: "硬質なハサミ", sp: 15 }, { name: "金属", sp: 100 }, { name: "木材", sp: 50 }] },
+            { jp: "バーサクブレイド", en: "Berserk Blade", atk: 110, note: "", type: "two-handed", materials: [{ name: "割れた大剣の破片", sp: 3 }, { name: "重く丈夫な鎖", sp: 2 }, { name: "金属", sp: 500 }, { name: "獣品", sp: 150 }] },
+            { jp: "ハンマーフォール", en: "Hammerfall", atk: 120, note: "", type: "two-handed", materials: [{ name: "ゴブリンの大爪", sp: 1 }, { name: "折れた大鎌", sp: 20 }, { name: "金属", sp: 150 }, { name: "木材", sp: 25 }] },
+            { jp: "デザーアンフェル", en: "Deser Anfer", atk: 130, note: "", type: "two-handed", materials: [{ name: "グーブアの仮面片", sp: 3 }, { name: "グーブアの肩当", sp: 2 }, { name: "金属", sp: 400 }, { name: "木材", sp: 350 }] },
+            { jp: "フレイムブレード", en: "Flame Blade", atk: 140, note: "", type: "two-handed", materials: [{ name: "昇華の石材", sp: 6 }, { name: "昇華の宝石", sp: 3 }, { name: "灼熱たまねぎ", sp: 1 }, { name: "金属", sp: 200 }] },
+            { jp: "氷大剣ライム", en: "Ice Greatsword Lime", atk: 150, note: "氷属性", type: "two-handed", materials: [{ name: "氷のバラ", sp: 1 }, { name: "宵闇竜の蒼羽", sp: 5 }, { name: "魔晶獣の豪爪", sp: 3 }, { name: "魔素", sp: 425 }] },
+            { jp: "デスペランサ", en: "Desperanza", atk: 160, note: "", type: "two-handed", materials: [{ name: "異形の刃物", sp: 5 }, { name: "漆黒大盾の破片", sp: 20 }, { name: "暗黒キノコ", sp: 20 }, { name: "金属", sp: 225 }] },
+            { jp: "ウィンドプランダー", en: "Wind Plunder", atk: 170, note: "", type: "two-handed", materials: [{ name: "魔兵長の紋章", sp: 3 }, { name: "魔結晶の翼片", sp: 2 }, { name: "旋風の宝珠", sp: 1 }, { name: "金属", sp: 1000 }] },
+            { jp: "シールブレイド", en: "Seal Blade", atk: 180, note: "", type: "two-handed", materials: [{ name: "いびつな刃", sp: 20 }, { name: "濃厚重油", sp: 5 }, { name: "金属", sp: 175 }, { name: "獣品", sp: 75 }] },
+            { jp: "シーネルガティス", en: "Cinelgatis", atk: 190, note: "", type: "two-handed", materials: [{ name: "イコノスコア", sp: 1 }, { name: "燃料パイプ", sp: 3 }, { name: "金属", sp: 1000 }, { name: "薬品", sp: 100 }] },
+            { jp: "ツヴァイハンダー", en: "Zweihander", atk: 200, note: "", type: "two-handed", materials: [{ name: "堅牢な木材", sp: 20 }, { name: "オリハル鉱石", sp: 1 }, { name: "金属", sp: 250 }, { name: "木材", sp: 25 }] },
+            { jp: "機鋼大剣", en: "Machine Steel Greatsword", atk: 210, note: "", type: "two-handed", materials: [{ name: "強靭な顎", sp: 20 }, { name: "折れたバット", sp: 30 }, { name: "金属", sp: 250 }, { name: "木材", sp: 50 }] },
+            { jp: "ガイストヴァルト", en: "Geistwald", atk: 220, note: "", type: "two-handed", materials: [{ name: "神秘の結晶石", sp: 1 }, { name: "魔力を帯びた岩石", sp: 2 }, { name: "木材", sp: 1000 }, { name: "金属", sp: 300 }] },
+            { jp: "カービングエッジ", en: "Carving Edge", atk: 230, note: "", type: "two-handed", materials: [{ name: "ミスルナ石材", sp: 20 }, { name: "忘失の石材", sp: 20 }, { name: "金属", sp: 250 }, { name: "木材", sp: 75 }] },
+            { jp: "オーダーエスパーダ", en: "Order Espada", atk: 240, note: "", type: "two-handed", materials: [{ name: "エーテルメタル", sp: 1 }, { name: "黒騎士長の腰布", sp: 1 }, { name: "黒騎士長の勲章", sp: 1 }, { name: "金属", sp: 1350 }] },
+            { jp: "アネモスブレード", en: "Anemos Blade", atk: 250, note: "", type: "two-handed", materials: [{ name: "碧色の結晶片", sp: 5 }, { name: "恵与神の石材", sp: 20 }, { name: "金属", sp: 200 }, { name: "木材", sp: 150 }] },
+            { jp: "皇女の大剣", en: "Empress Greatsword", atk: 260, note: "", type: "two-handed", materials: [{ name: "怪物皇帝の装飾片", sp: 2 }, { name: "怪物皇帝の結晶", sp: 3 }, { name: "金属", sp: 1000 }, { name: "魔素", sp: 450 }] },
+            { jp: "ゼルブレード", en: "Zel Blade", atk: 270, note: "", type: "two-handed", materials: [{ name: "ひび割れた天球", sp: 1 }, { name: "神々しい石柱", sp: 3 }, { name: "金属", sp: 1250 }, { name: "獣品", sp: 250 }] },
+            { jp: "ロゼラム", en: "Roselam", atk: 280, note: "", type: "two-handed", materials: [{ name: "誘惑の花", sp: 5 }, { name: "月の石", sp: 5 }, { name: "金属", sp: 350 }, { name: "魔素", sp: 25 }] },
+            { jp: "ストラーフエッジ", en: "Straf Edge", atk: 290, note: "", type: "two-handed", materials: [{ name: "猛毒の結晶", sp: 10 }, { name: "うごめく球体", sp: 15 }, { name: "金属", sp: 300 }, { name: "木材", sp: 100 }] },
+            { jp: "スクードブレイド", en: "Scudo Blade", atk: 300, note: "", type: "two-handed", materials: [{ name: "拘束具の金具", sp: 20 }, { name: "悪霊の双角", sp: 10 }, { name: "金属", sp: 300 }, { name: "木材", sp: 125 }] },
+            { jp: "アウフクレーラー", en: "Aufklarer", atk: 310, note: "", type: "two-handed", materials: [{ name: "ベクティガの晶牙", sp: 2 }, { name: "ベクティガの尻尾", sp: 1 }, { name: "金属", sp: 1500 }, { name: "魔素", sp: 300 }] },
+            { jp: "ヴュステブレード", en: "Vuste Blade", atk: 320, note: "", type: "two-handed", materials: [{ name: "不気味な鉱石", sp: 5 }, { name: "螺旋の幹", sp: 15 }, { name: "金属", sp: 300 }, { name: "獣品", sp: 150 }] },
+            { jp: "バルターブレード", en: "Baltar Blade", atk: 330, note: "", type: "two-handed", materials: [{ name: "結晶大鷹の刃", sp: 3 }, { name: "バルターコア", sp: 1 }, { name: "獣品", sp: 1200 }, { name: "金属", sp: 700 }] },
+            { jp: "アエラスブレード", en: "Aeras Blade", atk: 340, note: "", type: "two-handed", materials: [{ name: "石質背甲", sp: 25 }, { name: "不思議な花", sp: 5 }, { name: "金属", sp: 275 }, { name: "獣品", sp: 200 }] },
+            { jp: "皇魔の大剣", en: "Imperial Magic Greatsword", atk: 350, note: "", type: "two-handed", materials: [{ name: "化天怪帝の装飾片", sp: 2 }, { name: "化天怪帝の結晶", sp: 2 }, { name: "金属", sp: 1400 }, { name: "魔素", sp: 550 }] },
+            { jp: "竜斬鉈", en: "Dragon Slayer Nata", atk: 360, note: "", type: "two-handed", materials: [{ name: "鬼火の欠片", sp: 5 }, { name: "上質石炭", sp: 20 }, { name: "金属", sp: 300 }, { name: "木材", sp: 200 }] },
+            { jp: "邪焔呪の大剣", en: "Evil Flame Curse Greatsword", atk: 370, note: "", type: "two-handed", materials: [{ name: "火焔角", sp: 1 }, { name: "呪魔の杭", sp: 1 }, { name: "獣品", sp: 1050 }, { name: "金属", sp: 1000 }] },
+            { jp: "ザイビオブレード", en: "Zaibio Blade", atk: 380, note: "", type: "two-handed", materials: [{ name: "ザービモン", sp: 2 }, { name: "卒竜の黒棘", sp: 2 }, { name: "金属", sp: 1650 }, { name: "獣品", sp: 450 }] },
+            { jp: "フラムブレード", en: "Flam Blade", atk: 390, note: "", type: "two-handed", materials: [{ name: "帯熱したガラス", sp: 5 }, { name: "硬い切歯", sp: 10 }, { name: "金属", sp: 300 }, { name: "獣品", sp: 225 }] },
+            { jp: "バテリア", en: "Bacteria", atk: 400, note: "", type: "two-handed", materials: [{ name: "光沢のある甲殻", sp: 20 }, { name: "悠久甲羅", sp: 20 }, { name: "金属", sp: 300 }, { name: "木材", sp: 250 }] },
+            { jp: "センザンブレード", en: "Senzan Blade", atk: 410, note: "", type: "two-handed", materials: [{ name: "炸裂する結晶", sp: 1 }, { name: "ギュルダーの爪", sp: 2 }, { name: "獣品", sp: 1500 }, { name: "金属", sp: 800 }] },
+            { jp: "ネロサーベル", en: "Nero Saber", atk: 420, note: "", type: "two-handed", materials: [{ name: "粘り気のある泡", sp: 15 }, { name: "浸食された石柱", sp: 15 }, { name: "獣品", sp: 350 }, { name: "金属", sp: 225 }] },
+            { jp: "セイクリッドアクス", en: "Sacred Axe", atk: 430, note: "", type: "two-handed", materials: [{ name: "十字な鉤爪", sp: 20 }, { name: "元気な球根", sp: 10 }, { name: "金属", sp: 400 }, { name: "木材", sp: 200 }] },
+            { jp: "ハボンエスパーダ", en: "Habon Espada", atk: 440, note: "", type: "two-handed", materials: [{ name: "ガラムーワの角", sp: 2 }, { name: "不思議なシャボン液", sp: 1 }, { name: "獣品", sp: 1250 }, { name: "金属", sp: 1200 }] },
+            { jp: "ドンナーブレード", en: "Donner Blade", atk: 450, note: "", type: "two-handed", materials: [{ name: "鮭の切り身", sp: 20 }, { name: "丈夫な骨格", sp: 10 }, { name: "金属", sp: 400 }, { name: "獣品", sp: 225 }] },
+            { jp: "アヴィドブレード", en: "Avid Blade", atk: 460, note: "", type: "two-handed", materials: [{ name: "轟心核", sp: 1 }, { name: "轟竜の堅翼", sp: 2 }, { name: "獣品", sp: 2000 }, { name: "金属", sp: 650 }] },
+            { jp: "海深大剣", en: "Deep Sea Greatsword", atk: 470, note: "", type: "two-handed", materials: [{ name: "ビスキーバの立角", sp: 1 }, { name: "ビスキーバの水掻き", sp: 2 }, { name: "獣品", sp: 1600 }, { name: "金属", sp: 1200 }] }
+        ];
+
+        const materialInput = document.getElementById("material-input");
+        const results = document.getElementById("results");
+        const searchButton = document.getElementById("search-button");
+        const weaponTypeButtons = document.querySelectorAll(".weapon-type");
+
+        // 選択中の武器種（複数選択可）
+        let selectedTypes = ["one-handed", "two-handed"];
+
+        // 武器種ボタンのトグル処理
+        weaponTypeButtons.forEach(button => {
+            button.addEventListener("click", () => {
+                const type = button.getAttribute("data-type");
+                if (selectedTypes.includes(type)) {
+                    selectedTypes = selectedTypes.filter(t => t !== type);
+                    button.classList.remove("active");
+                } else {
+                    selectedTypes.push(type);
+                    button.classList.add("active");
+                }
+                // 少なくとも1つは選択必須
+                if (selectedTypes.length === 0) {
+                    selectedTypes = ["one-handed", "two-handed"];
+                    weaponTypeButtons.forEach(btn => {
+                        if (["one-handed", "two-handed"].includes(btn.getAttribute("data-type"))) {
+                            btn.classList.add("active");
+                        }
+                    });
+                }
+                performSearch(materialInput.value);
+            });
+        });
+
+        // HTMLエスケープ
+        function escapeHTML(str) {
+            if (typeof str !== "string") return "";
+            return str.replace(/[&<>"']/g, match => ({
+                '&': '&amp;',
+                '<': '&lt;',
+                '>': '&gt;',
+                '"': '&quot;',
+                "'": '&#39;'
+            })[match]);
+        }
+
+        // 検索実行
+        function performSearch(materialQuery) {
+            materialQuery = escapeHTML(materialQuery.trim()).toLowerCase();
+            const hiraganaMaterialQuery = wanakana.toHiragana(materialQuery);
+            results.innerHTML = "";
+
+            if (!materialQuery) {
+                results.innerHTML = "<p class='no-result'>素材を入力してください</p>";
+                return;
+            }
+
+            const matches = weapons.filter(weapon => 
+                selectedTypes.includes(weapon.type) && 
+                weapon.materials.some(material => 
+                    material.name.toLowerCase().includes(hiraganaMaterialQuery)
+                )
+            );
+
+            if (matches.length === 0) {
+                results.innerHTML = "<p class='no-result'>該当する武器が見つかりません</p>";
+                return;
+            }
+
+            const table = document.createElement("table");
+            table.innerHTML = `
+                <tr>
+                    <th>日本語名</th>
+                    <th>英語名</th>
+                    <th>Base ATK</th>
+                    <th>素材</th>
+                    <th>備考</th>
+                </tr>
+            `;
+            matches.forEach(weapon => {
+                const materialsList = weapon.materials.map(m => `${escapeHTML(m.name)} ${m.sp}p`).join(", ");
+                const row = document.createElement("tr");
+                row.innerHTML = `
+                    <td>${escapeHTML(weapon.jp)}</td>
+                    <td>${escapeHTML(weapon.en)}</td>
+                    <td>${escapeHTML(weapon.atk.toString())}</td>
+                    <td>${materialsList}</td>
+                    <td>${escapeHTML(weapon.note)}</td>
+                `;
+                table.appendChild(row);
+            });
+            results.appendChild(table);
+        }
+
+        // 検索ボタン
+        searchButton.addEventListener("click", () => {
+            performSearch(materialInput.value);
+        });
+
+        // 素材入力イベント（即時検索）
+        materialInput.addEventListener("input", () => {
+            performSearch(materialInput.value);
+        });
+
+        // Enterキーで検索
+        materialInput.addEventListener("keypress", (e) => {
+            if (e.key === "Enter") {
+                performSearch(materialInput.value);
+            }
+        });
+    </script>
+</body>
+</html>
